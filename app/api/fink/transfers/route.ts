@@ -34,7 +34,17 @@ function generateTransactionId(): string {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: FinkTransferRequest = await request.json();
+    let body: FinkTransferRequest;
+    try {
+      body = await request.json();
+    } catch (parseError) {
+      const errorResponse: ErrorResponse = {
+        error: 'BadRequest',
+        message: 'Invalid JSON in request body',
+        details: null,
+      };
+      return NextResponse.json(errorResponse, { status: 400 });
+    }
 
     // Validate required fields
     if (typeof body.sessionId !== 'string') {
@@ -100,17 +110,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(response, { status: 200 });
   } catch (error) {
-    // Handle JSON parsing errors or other unexpected errors
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    if (error instanceof SyntaxError || errorMessage.includes('JSON')) {
-      const errorResponse: ErrorResponse = {
-        error: 'BadRequest',
-        message: 'Invalid JSON in request body',
-        details: null,
-      };
-      return NextResponse.json(errorResponse, { status: 400 });
-    }
-
+    // Handle any unexpected errors
+    console.error('Unexpected error in transfers endpoint:', error);
     const errorResponse: ErrorResponse = {
       error: 'InternalError',
       message: 'An unexpected error occurred',
