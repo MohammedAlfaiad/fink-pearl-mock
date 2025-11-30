@@ -1,28 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { decodeSessionId } from '@/lib/finkSession';
 
-interface FinkRequest {
-  sourceAccount: {
-    id?: string;
-    type?: string;
-  };
-  transaction: {
-    amount?: number;
-    currency?: string;
-    description?: string;
-  };
-  idempotencyKey?: string;
+interface FinkTransferRequest {
+  sessionId?: string;
+  amount?: number;
 }
 
-interface FinkResponse {
+interface FinkTransferResponse {
   status: 'SUCCESS' | 'FAILED';
   transactionId: string | null;
   processedAt: string;
   failureCode: string | null;
   failureReason: string | null;
   echo: {
-    sourceAccountId: string;
+    sessionId: string;
     amount: number;
-    currency: string;
   };
 }
 
@@ -42,61 +34,67 @@ function generateTransactionId(): string {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: FinkRequest = await request.json();
+    const body: FinkTransferRequest = await request.json();
 
-    // Validate required fields - check that sourceAccount.id exists and is a string
-    if (!body.sourceAccount || typeof body.sourceAccount.id !== 'string') {
+    // Validate required fields
+    if (typeof body.sessionId !== 'string') {
       const errorResponse: ErrorResponse = {
         error: 'BadRequest',
-        message: 'sourceAccount.id is required',
+        message: 'sessionId is required',
         details: null,
       };
       return NextResponse.json(errorResponse, { status: 400 });
     }
 
-    if (typeof body.transaction?.amount !== 'number') {
+    if (typeof body.amount !== 'number') {
       const errorResponse: ErrorResponse = {
         error: 'BadRequest',
-        message: 'transaction.amount is required and must be a number',
+        message: 'amount is required and must be a number',
         details: null,
       };
       return NextResponse.json(errorResponse, { status: 400 });
     }
 
-    const sourceAccountId = body.sourceAccount.id.trim();
-    const amount = body.transaction.amount;
-    const currency = body.transaction.currency || 'USD';
+    const sessionId = body.sessionId.trim();
+    const amount = body.amount;
     const processedAt = new Date().toISOString();
 
-    // Business logic
+    // Decode the session ID to get the tag
+    const { tag } = decodeSessionId(sessionId);
+
+    // Business logic based on the tag from session ID
     let status: 'SUCCESS' | 'FAILED';
     let failureCode: string | null = null;
     let failureReason: string | null = null;
     let transactionId: string | null = null;
 
-    if (!sourceAccountId || sourceAccountId.length === 0) {
+    if (tag === 'SUCCESS') {
+      status = 'SUCCESS';
+      transactionId = generateTransactionId();
+    } else if (tag === 'INVALID_ACCOUNT') {
       status = 'FAILED';
       failureCode = 'INVALID_ACCOUNT';
       failureReason = 'Account ID is missing or empty';
-    } else if (sourceAccountId.endsWith('999')) {
+    } else if (tag === 'ACCOUNT_BLOCKED') {
       status = 'FAILED';
       failureCode = 'ACCOUNT_BLOCKED';
       failureReason = 'Transfers from this account are blocked';
     } else {
-      status = 'SUCCESS';
-      transactionId = generateTransactionId();
+      // Unknown or malformed session ID
+      status = 'FAILED';
+      failureCode = 'INVALID_SESSION';
+      failureReason = 'Invalid or malformed session ID';
     }
 
-    const response: FinkResponse = {
+    const response: FinkTransferResponse = {
       status,
       transactionId,
       processedAt,
       failureCode,
       failureReason,
       echo: {
-        sourceAccountId,
+        sessionId,
         amount,
-        currency,
       },
     };
 
@@ -121,4 +119,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(errorResponse, { status: 500 });
   }
 }
-

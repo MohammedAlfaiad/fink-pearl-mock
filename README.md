@@ -19,113 +19,181 @@ bun dev
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
 The API endpoints are available at:
-- **Pearl**: `http://localhost:3000/api/pearl/university-verifications`
-- **Fink**: `http://localhost:3000/api/fink/transfers`
+- **Pearl Student**: `http://localhost:3000/api/pearl/student-verifications`
+- **Pearl Staff**: `http://localhost:3000/api/pearl/staff-verifications`
+- **Fink Sessions**: `http://localhost:3000/api/fink/sessions`
+- **Fink Transfers**: `http://localhost:3000/api/fink/transfers`
 
 ## API Endpoints
 
-### Pearl: University Verification API
+### Pearl: Student Verification API
 
-**Endpoint**: `POST /api/pearl/university-verifications`
+**Endpoint**: `POST /api/pearl/student-verifications`
 
-Verifies whether a student is eligible for membership based on their university ID.
+Verifies whether a student is eligible for membership based on their person ID.
 
 **Example Request (Success)**:
 ```bash
-curl -X POST http://localhost:3000/api/pearl/university-verifications \
+curl -X POST http://localhost:3000/api/pearl/student-verifications \
   -H "Content-Type: application/json" \
   -d '{
-    "student": {
-      "universityId": "U2024001",
-      "fullName": "Alice Johnson"
-    },
-    "context": {
-      "requestedBySystem": "library-membership",
-      "requestId": "c0b5a8e8-9f4f-4a12-b154-4b21f3a7a001"
-    }
+    "personId": "U2024001",
+    "fullName": "Alice Johnson"
   }'
 ```
 
 **Example Response (Success)**:
 ```json
 {
-  "universityId": "U2024001",
+  "personId": "U2024001",
   "verified": true,
-  "reason": "University ID accepted",
+  "reason": "Student ID accepted",
   "checkedAt": "2025-11-30T12:34:57Z",
-  "metadata": {
-    "provider": "Pearl",
-    "rule": "simple-suffix-check"
-  }
+  "role": "STUDENT"
 }
 ```
 
 **Example Request (Blocked Pattern - ends with "000")**:
 ```bash
-curl -X POST http://localhost:3000/api/pearl/university-verifications \
+curl -X POST http://localhost:3000/api/pearl/student-verifications \
   -H "Content-Type: application/json" \
   -d '{
-    "student": {
-      "universityId": "U2024000"
-    }
+    "personId": "U2024000"
   }'
 ```
 
 **Example Response (Blocked)**:
 ```json
 {
-  "universityId": "U2024000",
+  "personId": "U2024000",
   "verified": false,
-  "reason": "University verification failed (blocked pattern)",
+  "reason": "Student verification failed (blocked pattern)",
   "checkedAt": "2025-11-30T12:34:57Z",
-  "metadata": {
-    "provider": "Pearl",
-    "rule": "simple-suffix-check"
-  }
+  "role": "STUDENT"
 }
 ```
 
-**Example Request (Missing Required Field)**:
+### Pearl: Staff Verification API
+
+**Endpoint**: `POST /api/pearl/staff-verifications`
+
+Verifies whether a staff member is eligible for membership based on their person ID.
+
+**Example Request (Success)**:
 ```bash
-curl -X POST http://localhost:3000/api/pearl/university-verifications \
+curl -X POST http://localhost:3000/api/pearl/staff-verifications \
   -H "Content-Type: application/json" \
   -d '{
-    "student": {
-      "fullName": "Alice Johnson"
-    }
+    "personId": "S2024001",
+    "fullName": "Bob Smith"
   }'
 ```
 
-**Example Response (400 Bad Request)**:
+**Example Response (Success)**:
 ```json
 {
-  "error": "BadRequest",
-  "message": "student.universityId is required",
-  "details": null
+  "personId": "S2024001",
+  "verified": true,
+  "reason": "Staff ID accepted",
+  "checkedAt": "2025-11-30T12:34:57Z",
+  "role": "STAFF"
 }
 ```
 
-### Fink: Payment Transfer API
+**Example Request (Blocked Pattern - ends with "999")**:
+```bash
+curl -X POST http://localhost:3000/api/pearl/staff-verifications \
+  -H "Content-Type: application/json" \
+  -d '{
+    "personId": "S2024999"
+  }'
+```
+
+**Example Response (Blocked)**:
+```json
+{
+  "personId": "S2024999",
+  "verified": false,
+  "reason": "Staff verification failed (blocked pattern)",
+  "checkedAt": "2025-11-30T12:34:57Z",
+  "role": "STAFF"
+}
+```
+
+### Fink: Open Session API
+
+**Endpoint**: `POST /api/fink/sessions`
+
+Opens a session for a Fink account. Returns a session ID that encodes the expected transfer outcome.
+
+**Example Request (Success)**:
+```bash
+curl -X POST http://localhost:3000/api/fink/sessions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "finkAccountId": "FINK-U2024001",
+    "currency": "USD"
+  }'
+```
+
+**Example Response (Success)**:
+```json
+{
+  "sessionId": "550e8400-e29b-41d4-a716-446655440000::SUCCESS",
+  "finkAccountId": "FINK-U2024001",
+  "statusHint": "SUCCESS"
+}
+```
+
+**Example Request (Blocked Account - ends with "999")**:
+```bash
+curl -X POST http://localhost:3000/api/fink/sessions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "finkAccountId": "FINK-U2024999"
+  }'
+```
+
+**Example Response (Blocked)**:
+```json
+{
+  "sessionId": "550e8400-e29b-41d4-a716-446655440001::ACCOUNT_BLOCKED",
+  "finkAccountId": "FINK-U2024999",
+  "statusHint": "ACCOUNT_BLOCKED"
+}
+```
+
+**Example Request (Empty Account ID)**:
+```bash
+curl -X POST http://localhost:3000/api/fink/sessions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "finkAccountId": ""
+  }'
+```
+
+**Example Response (Invalid Account)**:
+```json
+{
+  "sessionId": "550e8400-e29b-41d4-a716-446655440002::INVALID_ACCOUNT",
+  "finkAccountId": "",
+  "statusHint": "INVALID_ACCOUNT"
+}
+```
+
+### Fink: Transfer API
 
 **Endpoint**: `POST /api/fink/transfers`
 
-Simulates transferring funds from a student account to the library deposit account.
+Transfers funds using a session ID obtained from the open session endpoint.
 
 **Example Request (Success)**:
 ```bash
 curl -X POST http://localhost:3000/api/fink/transfers \
   -H "Content-Type: application/json" \
   -d '{
-    "sourceAccount": {
-      "id": "FINK-U2024001",
-      "type": "STUDENT_DEPOSIT"
-    },
-    "transaction": {
-      "amount": 200.0,
-      "currency": "USD",
-      "description": "Library membership deposit"
-    },
-    "idempotencyKey": "d9f1d0b4-5eae-4b39-842e-32fd406f9f2a"
+    "sessionId": "550e8400-e29b-41d4-a716-446655440000::SUCCESS",
+    "amount": 200.0
   }'
 ```
 
@@ -138,24 +206,19 @@ curl -X POST http://localhost:3000/api/fink/transfers \
   "failureCode": null,
   "failureReason": null,
   "echo": {
-    "sourceAccountId": "FINK-U2024001",
-    "amount": 200.0,
-    "currency": "USD"
+    "sessionId": "550e8400-e29b-41d4-a716-446655440000::SUCCESS",
+    "amount": 200.0
   }
 }
 ```
 
-**Example Request (Blocked Account - ends with "999")**:
+**Example Request (Using Blocked Session)**:
 ```bash
 curl -X POST http://localhost:3000/api/fink/transfers \
   -H "Content-Type: application/json" \
   -d '{
-    "sourceAccount": {
-      "id": "FINK-U2024999"
-    },
-    "transaction": {
-      "amount": 200.0
-    }
+    "sessionId": "550e8400-e29b-41d4-a716-446655440001::ACCOUNT_BLOCKED",
+    "amount": 200.0
   }'
 ```
 
@@ -168,24 +231,19 @@ curl -X POST http://localhost:3000/api/fink/transfers \
   "failureCode": "ACCOUNT_BLOCKED",
   "failureReason": "Transfers from this account are blocked",
   "echo": {
-    "sourceAccountId": "FINK-U2024999",
-    "amount": 200.0,
-    "currency": "USD"
+    "sessionId": "550e8400-e29b-41d4-a716-446655440001::ACCOUNT_BLOCKED",
+    "amount": 200.0
   }
 }
 ```
 
-**Example Request (Empty Account ID)**:
+**Example Request (Invalid Session ID)**:
 ```bash
 curl -X POST http://localhost:3000/api/fink/transfers \
   -H "Content-Type: application/json" \
   -d '{
-    "sourceAccount": {
-      "id": ""
-    },
-    "transaction": {
-      "amount": 200.0
-    }
+    "sessionId": "invalid-session-id",
+    "amount": 200.0
   }'
 ```
 
@@ -195,47 +253,38 @@ curl -X POST http://localhost:3000/api/fink/transfers \
   "status": "FAILED",
   "transactionId": null,
   "processedAt": "2025-11-30T12:35:10Z",
-  "failureCode": "INVALID_ACCOUNT",
-  "failureReason": "Account ID is missing or empty",
+  "failureCode": "INVALID_SESSION",
+  "failureReason": "Invalid or malformed session ID",
   "echo": {
-    "sourceAccountId": "",
-    "amount": 200.0,
-    "currency": "USD"
+    "sessionId": "invalid-session-id",
+    "amount": 200.0
   }
-}
-```
-
-**Example Request (Missing Required Field)**:
-```bash
-curl -X POST http://localhost:3000/api/fink/transfers \
-  -H "Content-Type: application/json" \
-  -d '{
-    "sourceAccount": {
-      "id": "FINK-U2024001"
-    }
-  }'
-```
-
-**Example Response (400 Bad Request)**:
-```json
-{
-  "error": "BadRequest",
-  "message": "transaction.amount is required and must be a number",
-  "details": null
 }
 ```
 
 ## Business Logic
 
-### Pearl
-- If `student.universityId` is `null`, empty, or whitespace-only → `verified = false`
-- If `student.universityId` ends with `"000"` → `verified = false`
+### Pearl Student Verification
+- If `personId` is `null`, empty, or whitespace-only → `verified = false`
+- If `personId` ends with `"000"` → `verified = false`
 - Otherwise → `verified = true`
 
-### Fink
-- If `sourceAccount.id` is `null`, empty, or whitespace-only → `status = "FAILED"`, `failureCode = "INVALID_ACCOUNT"`
-- If `sourceAccount.id` ends with `"999"` → `status = "FAILED"`, `failureCode = "ACCOUNT_BLOCKED"`
-- Otherwise → `status = "SUCCESS"`
+### Pearl Staff Verification
+- If `personId` is `null`, empty, or whitespace-only → `verified = false`
+- If `personId` ends with `"999"` → `verified = false`
+- Otherwise → `verified = true`
+
+### Fink Session Opening
+- If `finkAccountId` is `null`, empty, or whitespace-only → session tagged as `INVALID_ACCOUNT`
+- If `finkAccountId` ends with `"999"` → session tagged as `ACCOUNT_BLOCKED`
+- Otherwise → session tagged as `SUCCESS`
+
+### Fink Transfer
+- Decodes the tag from `sessionId`:
+  - Tag `SUCCESS` → `status = "SUCCESS"`
+  - Tag `INVALID_ACCOUNT` → `status = "FAILED"`, `failureCode = "INVALID_ACCOUNT"`
+  - Tag `ACCOUNT_BLOCKED` → `status = "FAILED"`, `failureCode = "ACCOUNT_BLOCKED"`
+  - Unknown/malformed session ID → `status = "FAILED"`, `failureCode = "INVALID_SESSION"`
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
