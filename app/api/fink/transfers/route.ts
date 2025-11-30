@@ -28,7 +28,11 @@ function generateTransactionId(): string {
   // Generate a synthetic transaction ID like "tr_01JK5ME5VQ3KQ1N8D9"
   const prefix = 'tr_';
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  const randomPart = Array.from({ length: 16 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  const charsLength = chars.length;
+  let randomPart = '';
+  for (let i = 0; i < 16; i++) {
+    randomPart += chars[Math.floor(Math.random() * charsLength)];
+  }
   return prefix + randomPart;
 }
 
